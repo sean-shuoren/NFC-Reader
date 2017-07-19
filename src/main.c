@@ -1,9 +1,10 @@
 #include "main.h"
 
 /* Timer Clock Scale */
-uint32_t uwPrescalerValue = 0;
+//uint32_t uwPrescalerValue = 0;
 
-int main(void) {
+int main(void)
+{
 	/* STM32F103xB HAL library initialization:
 	   - Configure the Flash prefetch
 	   - Systick timer is configured by default as source of time base, but user
@@ -19,83 +20,36 @@ int main(void) {
 	SystemClock_Config();
 	/* Configure LED2, LED2 and LED2 */
 	BSP_LED_Init(LED2);
+	/* Interrupt Priority */
+	HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_0);
 
-	/*  SPI initialization */
-	SpiHandle.Instance               = SPIx;
-	SpiHandle.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
-	SpiHandle.Init.Direction         = SPI_DIRECTION_2LINES;
-	SpiHandle.Init.CLKPhase          = SPI_PHASE_2EDGE;
-	SpiHandle.Init.CLKPolarity       = SPI_POLARITY_LOW;
-	SpiHandle.Init.DataSize          = SPI_DATASIZE_8BIT;
-	SpiHandle.Init.FirstBit          = SPI_FIRSTBIT_MSB;
-	SpiHandle.Init.TIMode            = SPI_TIMODE_DISABLE;
-	SpiHandle.Init.CRCCalculation    = SPI_CRCCALCULATION_DISABLE;
-	SpiHandle.Init.CRCPolynomial     = 7;
-	SpiHandle.Init.NSS               = SPI_NSS_SOFT;
-	SpiHandle.Init.Mode 			 = SPI_MODE_MASTER;
-
-	/* HAL_SPI_Init also calls HAL_SPI_MspInit() in stm32f1xx_hal_msp.c
-	 * which also initialize GPIO for SS and EN signals */
-	if(HAL_SPI_Init(&SpiHandle) != HAL_OK) {
-		Error_Handler();
-	}
-
-	/* SPI block is enabled prior calling SPI transmit/receive functions, in order to get CLK signal properly pulled down.
-	 Otherwise, SPI CLK signal is not clean on this board and leads to errors during transfer */
-	__HAL_SPI_ENABLE(&SpiHandle);
-
-
+	/* SPI initialization: MISO, MOSI, SCK, SS */
+	SPI_Config();
+	/* TRF Reader board EN GPIO pin configuration  */
+	GPIO_Config_EN();
 	/* Set TRF7970 IRQ */
-	GPIO_InitStruct.Mode  = GPIO_MODE_IT_RISING;
-	GPIO_InitStruct.Pull  = GPIO_NOPULL;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	GPIO_InitStruct.Pin   = TRF79XXA_IRQ_PIN;
-	/* GPIO Ports Clock Enable */
-	__HAL_RCC_GPIOB_CLK_ENABLE();
-	HAL_NVIC_SetPriority(EXTI15_10_IRQn, 3, 0);
-	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
-	/* GPIO Init */
-	HAL_GPIO_Init(TRF79XXA_IRQ_GPIO_PORT, &GPIO_InitStruct);
-
-
+	GPIO_Config_IRQ();
 	/* Set Timer instance */
-	/* Compute the prescaler value to have TIMx counter clock equal to 10000 Hz
-	 * Initialize TIMx peripheral as follows:
-	 *	   + Period = 10000 - 1
-	 *	   + Prescaler = (SystemCoreClock/10000) - 1
-	 *	   + ClockDivision = 0
-	 *	   + Counter direction = Up
-	 */
-	uwPrescalerValue = (uint32_t)(SystemCoreClock / 1000) - 1;
+	Timer_Config_Wait();
+	Timer_Config_Delay();
+	/* Initialize UART */
+	UART1_Init();
 
-	TimHandle.Instance 				 = TIMx;
-	TimHandle.Init.Period            = 1000 - 1;
-	TimHandle.Init.Prescaler         = uwPrescalerValue;
-	TimHandle.Init.ClockDivision     = 0;
-	TimHandle.Init.CounterMode       = TIM_COUNTERMODE_UP;
-	TimHandle.Init.RepetitionCounter = 0;
 
-	if (HAL_TIM_Base_Init(&TimHandle) != HAL_OK)
-		Error_Handler();
+	/*************************** Controlling TRF7970ABP ***************************/
 
-	Delay_TimHandle.Instance 			   = DELAY_TIM;
-	Delay_TimHandle.Init.Period            = 1000 - 1;
-	Delay_TimHandle.Init.Prescaler         = uwPrescalerValue;
-	Delay_TimHandle.Init.ClockDivision     = 0;
-	Delay_TimHandle.Init.CounterMode       = TIM_COUNTERMODE_UP;
-	Delay_TimHandle.Init.RepetitionCounter = 0;
+	/* Initialize lastUID */
+	int i;
+	for (i = 0; i < 8; ++i)
+		lastReadUID[i] = 0xFF;
+	/* Data structure for transmitting data on UART */
+	struct dataPacket pkt;
 
-	if (HAL_TIM_Base_Init(&Delay_TimHandle) != HAL_OK)
-		Error_Handler();
-
-	/**************************
-	* Controlling TRF7970ABP *
-	**************************/
 
 	// Set the SPI SS high
 	HAL_GPIO_WritePin(SPIx_SS_GPIO_PORT, SPIx_SS_PIN,  GPIO_PIN_SET);
 	// Set TRF Enable Pin high
-	HAL_GPIO_WritePin(TRF_EN_GPIO_PORT, TRF_EN_PIN, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(TRF79XXA_EN_GPIO_PORT, TRF79XXA_EN_PIN, GPIO_PIN_SET);
 	// Wait until TRF system clock started
 	delayMilliSeconds(2);
 
@@ -105,32 +59,28 @@ int main(void) {
 	TRF79xxA_ISO15693_init();
 
 	// Poll for NFC tags
-	while (1) {
-
+	while (1)
+	{
 		// Temperate variables
 		uint8_t ui8TagFound = STATUS_FAIL;
 		uint8_t ui8AddressedFlag = 0x00;
+		g_ui8TagDetectedCount = 0;
 
 		// This function performs RF collision avoidance as outlined in TI application notes (sloa192, sloa227)
 		// in order to determine if an external RF field is present.
+#ifdef ANTI_COLLISION
 		if (TRF79xxA_checkExternalRfField() == true)
-			Error_Handler();
+		 	Error_Handler();
+#endif
 
 		// Configure the TRF79xxA for ISO15693 @ High Bit Rate, One Subcarrier, 1 out of 4
 		TRF79xxA_setupInitiator(0x02);
 
-		// Reset tag count
-		g_ui8TagDetectedCount = 0;
-
 		// Send a single slot inventory request to try and detect a single ISO15693 Tag
-		// STATUS_FAIL == 0x01
-		ui8TagFound = TRF79xxA_ISO15693_sendSingleSlotInventory();
-
-		// RSSI value is the receive signal strength
-		// Format: 01 - [3 bits auxiliary channel RSSI] - [3 bits main channel RSSI]
-		uint8_t RSSI = TRF79xxA_readRegister(TRF79XXA_RSSI_LEVELS);
+		ui8TagFound = TRF79xxA_ISO15693_sendSingleSlotInventory();		/* STATUS_FAIL == 0x01 */
 
 		// Inventory failed - search with full anticollision routine
+#ifdef ANTI_COLLISION
 		if (ui8TagFound == STATUS_FAIL) {
 			// Clear the recursion counter
 			g_ui8RecursionCount = 0;
@@ -138,38 +88,51 @@ int main(void) {
 			delayMilliSeconds(5);
 
 			// Send 16 Slot Inventory request with no mask length and no AFI
-			 ui8TagFound = TRF79xxA_ISO15693_runAnticollision(0x06, 0x00, 0x00);
+			ui8TagFound = TRF79xxA_ISO15693_runAnticollision(0x06, 0x00, 0x00);
 
 			// Collision occurred, send addressed commands
 			ui8AddressedFlag = 0x20;
 		}
+#endif
 
-		if (ui8TagFound == STATUS_SUCCESS) {
-			if (g_ui8TagDetectedCount == 1) {
-				// Read an ISO15693 tag
-				// TRF79xxA_ISO15693_ReadTag(0x02 | ui8AddressedFlag);
+		if (ui8TagFound == STATUS_SUCCESS && g_ui8TagDetectedCount == 1)
+		{
+			// RSSI value is the receive signal strength
+			uint8_t RSSI = TRF79xxA_readRegister(TRF79XXA_RSSI_LEVELS);		/* [01]-[3 bits auxiliary channel RSSI]-[3 bits main channel RSSI] */
 
+			if (compareUID(g_pui8Iso15693UId, lastReadUID) == ID_DIFF)
+			{
 				// Read an ISO15693 tag which has extended protocol implemented
-				TRF79xxA_ISO15693_ReadExtendedTag(0x0A | ui8AddressedFlag);
+				if (TRF79xxA_ISO15693_ReadExtendedTag(0x0A | ui8AddressedFlag, pkt.tag_data) == STATUS_SUCCESS)
+				{
+					// Fill in data sections
+					copyUID(pkt.uid, g_pui8Iso15693UId);
+					pkt.tag_data_p[0] = pkt.tag_data[32];
+					pkt.tag_data_p[1] = pkt.tag_data[33];
+					pkt.tag_data_p[2] = pkt.tag_data[34];
+					pkt.tag_data_p[3] = pkt.tag_data[35];
 
-				// Example to read 25 blocks starting @ Block 0 from a tag which supports Read Multiple Block command
-				// TRF79xxA_ISO15693_sendReadMultipleBlocks(0x22,0x00,25);
+					// Transmit data packet to PC
+					if(HAL_UART_Transmit(&UartHandle, &pkt, 44, 5000)!= HAL_OK) {
+						Error_Handler();
+					}
+				}
+
+				// Update last read UID
+				copyUID(lastReadUID, g_pui8Iso15693UId);
 			}
 		}
-
 		// Turn off RF field once done reading the tag(s)
 		TRF79xxA_turnRfOff();
 	}
 
-	// End of the transmit
 	// Set the SPI SS High
 	HAL_GPIO_WritePin(SPIx_SS_GPIO_PORT, SPIx_SS_PIN,  GPIO_PIN_SET);
 	// Set TRF Enable Pin Low
 	HAL_Delay(2);
-	HAL_GPIO_WritePin(TRF_EN_GPIO_PORT, TRF_EN_PIN, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(TRF79XXA_EN_GPIO_PORT, TRF79XXA_EN_PIN, GPIO_PIN_RESET);
 
-	while(1);
-}
+} // main
 
 
 /**
@@ -228,4 +191,36 @@ void Error_Handler(void) {
 		HAL_Delay(1000);
 	}
 }
+
+
+
+/********************************************************/
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
+{
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *UartHandle)
+{
+    Error_Handler();
+}
+
+
+uint8_t compareUID(uint8_t* id_a, uint8_t* id_b) {
+	int i = 0;
+	for (; i < 8; ++i) {
+		if (id_a[i] != id_b[i]) {
+			return ID_DIFF;
+		}
+	}
+	return ID_SAME;
+}
+
+void copyUID(uint8_t* target, uint8_t* source) {
+	int i = 0;
+	for (; i < 8; ++i) {
+		target[i] = source[i];
+	}
+}
+
 

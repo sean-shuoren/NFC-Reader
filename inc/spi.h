@@ -42,10 +42,8 @@ static volatile uint32_t wTransferState = TRANSFER_WAIT;
 #define SPIx_MOSI_GPIO_CLK_ENABLE()      __HAL_RCC_GPIOB_CLK_ENABLE()
 
 /* Definition for SPIx Pins */
-#define TRF_EN_PIN                       GPIO_PIN_11	// TRF Reader board EN
-#define TRF_EN_GPIO_PORT                 GPIOB
-#define SPIx_SS_PIN                      GPIO_PIN_12	// SPI Select
-#define SPIx_SS_GPIO_PORT                GPIOB
+//#define TRF_EN_PIN                       GPIO_PIN_11	// TRF Reader board EN
+//#define TRF_EN_GPIO_PORT                 GPIOB
 
 #define SPIx_SCK_PIN                     GPIO_PIN_13
 #define SPIx_SCK_GPIO_PORT               GPIOB
@@ -53,10 +51,16 @@ static volatile uint32_t wTransferState = TRANSFER_WAIT;
 #define SPIx_MISO_GPIO_PORT              GPIOB
 #define SPIx_MOSI_PIN                    GPIO_PIN_15
 #define SPIx_MOSI_GPIO_PORT              GPIOB
+#define SPIx_SS_PIN                      GPIO_PIN_12	// SPI Select
+#define SPIx_SS_GPIO_PORT                GPIOB
 
 /* Definition for SPIx's NVIC */
 #define SPIx_IRQn                        SPI2_IRQn
 #define SPIx_IRQHandler                  SPI2_IRQHandler
+
+
+/* SPI functions */
+void SPI_Config(void);
 
 
 #endif /* SPI_H_ */

@@ -41,6 +41,8 @@
 
 //===============================================================
 #include "spi.h"
+#include "uart.h"
+#include "gpio.h"
 #include <stdbool.h>
 
 //===============================================================
@@ -266,15 +268,6 @@ uint8_t g_ui8RecursionCount;
 
 
 //===============================================================
-// TRF7970A to the controller IRQ
-
-#define TRF79XXA_IRQ_PIN			GPIO_PIN_10
-#define TRF79XXA_IRQ_GPIO_PORT 		GPIOB
-
-GPIO_InitTypeDef  GPIO_InitStruct;
-
-
-//===============================================================
 
 extern void TRF79xxA_setupInitiator(uint8_t ui8IsoControl);
 extern void TRF79xxA_initialSettings(void);
@@ -317,16 +310,18 @@ extern void TRF79xxA_ISO15693_init(void);
 extern uint8_t TRF79xxA_ISO15693_sendSingleSlotInventory(void);
 extern uint8_t TRF79xxA_ISO15693_runAnticollision(uint8_t ui8ReqFlags, uint8_t ui8MaskLength, uint8_t ui8Afi);
 extern void TRF79xxA_ISO15693_ReadTag(uint8_t ui8ReqFlag);
-extern void TRF79xxA_ISO15693_ReadExtendedTag(uint8_t ui8ReqFlag);
+extern uint8_t TRF79xxA_ISO15693_ReadExtendedTag(uint8_t ui8ReqFlag, uint8_t* dataBuf);
 extern uint8_t TRF79xxA_ISO15693_sendReadMultipleBlocks(uint8_t ui8ReqFlag, uint8_t ui8FirstBlock, uint8_t ui8NumberOfBlocks);
 
 uint16_t TRF79xxA_ISO15693_sendGetSystemInfo(uint8_t ui8ReqFlag);
 uint16_t TRF79xxA_ISO15693_sendGetSystemInfoExtended(uint8_t ui8ReqFlag);
 uint8_t TRF79xxA_ISO15693_sendReadSingleBlock(uint8_t ui8ReqFlag, uint8_t ui8BlockNumber);
-uint8_t TRF79xxA_ISO15693_sendReadSingleBlockExtended(uint8_t ui8ReqFlag, uint16_t ui16BlockNumber);
+uint8_t TRF79xxA_ISO15693_sendReadSingleBlockExtended(uint8_t ui8ReqFlag, uint16_t ui16BlockNumber, uint8_t* data_buff);
 
 
 
 //===============================================================
+
+
 
 #endif

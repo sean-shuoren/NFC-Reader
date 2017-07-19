@@ -5,7 +5,13 @@
 #include "stm32f1xx_hal_tim.h"
 #include "stm32f1xx_nucleo.h"
 
-/* Set Timer instance */
+/* Compute the prescaler value to have TIMx counter clock equal to 10000 Hz
+ * Initialize TIMx peripheral as follows:
+ *	   + Period = 10000 - 1
+ *	   + Prescaler = (SystemCoreClock/10000) - 1
+ *	   + ClockDivision = 0
+ *	   + Counter direction = Up
+ */
 
 /* Definition for TIMx clock resources */
 #define TIMx                        TIM3
@@ -35,6 +41,9 @@ volatile TimStatus delayStatus;
 volatile TimStatus waitStatus;
 
 /************ Utility function ***********/
+void Timer_Config_Delay(void);
+void Timer_Config_Wait(void);
+
 void delayMilliSeconds(uint32_t);
 void waitMilliSeconds(uint32_t);
 

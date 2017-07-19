@@ -59,6 +59,10 @@ void DebugMon_Handler(void);
 void PendSV_Handler(void);
 void SysTick_Handler(void);
 
+// Handler for UART
+void USART1_IRQHandler(void);
+
+
 #ifdef __cplusplus
 }
 #endif

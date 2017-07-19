@@ -67,3 +67,11 @@ void DELAY_TIM_IRQHandler(void) {
 void EXTI15_10_IRQHandler(void) {
   HAL_GPIO_EXTI_IRQHandler(TRF79XXA_IRQ_PIN);
 }
+
+extern UART_HandleTypeDef UartHandle;
+
+void USART1_IRQHandler(void)
+{
+  HAL_UART_IRQHandler(&UartHandle);
+}
+

@@ -15,16 +15,46 @@ void HAL_TIM_Base_MspInit(TIM_HandleTypeDef *htim)
 
 	if (htim->Instance == TIMx) {
 		TIMx_CLK_ENABLE();
-		HAL_NVIC_SetPriority(TIMx_IRQn, 3, 1);
+		HAL_NVIC_SetPriority(TIMx_IRQn, 0, 0);
 		HAL_NVIC_EnableIRQ(TIMx_IRQn);
 	}
 
 	if (htim->Instance == DELAY_TIM) {
 		DELAY_TIM_CLK_ENABLE();
-		HAL_NVIC_SetPriority(DELAY_TIM_IRQn, 3, 2);
+		HAL_NVIC_SetPriority(DELAY_TIM_IRQn, 0, 0);
 		HAL_NVIC_EnableIRQ(DELAY_TIM_IRQn);
 	}
 
+}
+
+void Timer_Config_Wait(void)
+{
+	uint32_t uwPrescalerValue = (uint32_t)(SystemCoreClock / 1000) - 1;
+
+	TimHandle.Instance 				 = TIMx;
+	TimHandle.Init.Period            = 1000 - 1;
+	TimHandle.Init.Prescaler         = uwPrescalerValue;
+	TimHandle.Init.ClockDivision     = 0;
+	TimHandle.Init.CounterMode       = TIM_COUNTERMODE_UP;
+	TimHandle.Init.RepetitionCounter = 0;
+
+	if (HAL_TIM_Base_Init(&TimHandle) != HAL_OK)
+		Error_Handler();
+}
+
+void Timer_Config_Delay(void)
+{
+	uint32_t uwPrescalerValue = (uint32_t)(SystemCoreClock / 1000) - 1;
+
+	Delay_TimHandle.Instance 			   = DELAY_TIM;
+	Delay_TimHandle.Init.Period            = 1000 - 1;
+	Delay_TimHandle.Init.Prescaler         = uwPrescalerValue;
+	Delay_TimHandle.Init.ClockDivision     = 0;
+	Delay_TimHandle.Init.CounterMode       = TIM_COUNTERMODE_UP;
+	Delay_TimHandle.Init.RepetitionCounter = 0;
+
+	if (HAL_TIM_Base_Init(&Delay_TimHandle) != HAL_OK)
+		Error_Handler();
 }
 
 /**

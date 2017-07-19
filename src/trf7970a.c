@@ -390,7 +390,7 @@ void TRF79xxA_reset(void)
 	TRF79xxA_sendDirectCommand(TRF79XXA_SOFT_INIT_CMD);
 	TRF79xxA_sendDirectCommand(TRF79XXA_IDLE_CMD);
 
-	delayMilliSeconds(2);
+//	delayMilliSeconds(2);
 
 	TRF79xxA_resetFIFO();			// Reset the FIFO
 
@@ -1254,7 +1254,7 @@ void TRF79xxA_ISO15693_init(void)
 //! if the Inventory command resulted in a successful tag detection or not.
 //
 //*****************************************************************************
-uint8_t TRF79xxA_ISO15693_sendSingleSlotInventory(void)
+uint8_t TRF79xxA_ISO15693_sendSingleSlotInventory()
 {
 	uint8_t ui8Offset = 0;
 	uint8_t ui8LoopCount = 0;
@@ -1280,8 +1280,10 @@ uint8_t TRF79xxA_ISO15693_sendSingleSlotInventory(void)
 			ui8Status = STATUS_SUCCESS;
 
 			// UID Starts at the 3rd received bit (1st is flags and 2nd is DSFID)
-			for (ui8LoopCount = 2; ui8LoopCount < 10; ui8LoopCount++)
-				g_pui8Iso15693UId[ui8LoopCount-2] = g_pui8TrfBuffer[ui8LoopCount];	// Store UID into a Buffer
+			for (ui8LoopCount = 2; ui8LoopCount < 10; ui8LoopCount++) {
+				// Store UID into a Buffer
+				g_pui8Iso15693UId[ui8LoopCount-2] = g_pui8TrfBuffer[ui8LoopCount];
+			}
 
 			g_ui8TagDetectedCount = 1;
 		}
@@ -1609,9 +1611,9 @@ void TRF79xxA_ISO15693_ReadTag(uint8_t ui8ReqFlag)
 //! \return None.
 //
 //*****************************************************************************
-void TRF79xxA_ISO15693_ReadExtendedTag(uint8_t ui8ReqFlag) {
+uint8_t TRF79xxA_ISO15693_ReadExtendedTag(uint8_t ui8ReqFlag, uint8_t* dataBuf) {
 	uint16_t ui16ReadBlocks = 0x00;
-	uint16_t ui16LoopCount = 0x00;
+	uint16_t i = 0x00;
 
 	ui8ReqFlag |= 0x08; 	// Add in Protocol Extension Flag if it was omitted from the inputted request flags
 
@@ -1619,17 +1621,16 @@ void TRF79xxA_ISO15693_ReadExtendedTag(uint8_t ui8ReqFlag) {
 
 	if (ui16ReadBlocks != 0x00)
 	{
-		// Read all available blocks on the ISO15693 Tag
-		for (ui16LoopCount = 0; ui16LoopCount < ui16ReadBlocks+1; ui16LoopCount++)
-		{
+		// Read 8 blocks on the ISO15693 Tag
+		for (i = 0; i < 9; i++) {
 			// Keep reading blocks until a No Response is received
-			if (TRF79xxA_ISO15693_sendReadSingleBlockExtended(ui8ReqFlag, ui16LoopCount) == STATUS_FAIL)
-			{
-				// No Response - stop reading
-				break;
+			if (TRF79xxA_ISO15693_sendReadSingleBlockExtended(ui8ReqFlag, i, dataBuf + 4*i) == STATUS_FAIL) {
+				return STATUS_FAIL;
 			}
 		}
+		return STATUS_SUCCESS;
 	}
+	return STATUS_FAIL;
 }
 
 //*****************************************************************************
@@ -2112,7 +2113,7 @@ uint8_t TRF79xxA_ISO15693_sendReadSingleBlock(uint8_t ui8ReqFlag, uint8_t ui8Blo
 //! to indicate if the Read Single Block was successful or not.
 //
 //*****************************************************************************
-uint8_t TRF79xxA_ISO15693_sendReadSingleBlockExtended(uint8_t ui8ReqFlag, uint16_t ui16BlockNumber)
+uint8_t TRF79xxA_ISO15693_sendReadSingleBlockExtended(uint8_t ui8ReqFlag, uint16_t ui16BlockNumber, uint8_t* data_buff)
 {
 	uint8_t ui8Offset = 0;
 	uint8_t ui8Status = STATUS_FAIL;
@@ -2160,52 +2161,18 @@ uint8_t TRF79xxA_ISO15693_sendReadSingleBlockExtended(uint8_t ui8ReqFlag, uint16
 		if (g_pui8TrfBuffer[0] == 0x00)		// Confirm "no error" in response flags byte
 		{
 			// Response received
-			// Results are in g_pui8TrfBuffer[1] to g_pui8TrfBuffer[4]
 			ui8Status = STATUS_SUCCESS;
 
-#ifdef ENABLE_HOST
-			UART_sendCString("Block ");
-			UART_putByte((ui16BlockNumber >> 8) & 0xFF);			// Output block number
-			UART_putByte(ui16BlockNumber & 0xFF);
-			UART_sendCString(" Data: ");
-			UART_putChar('[');
-
-			ui8RxLength = TRF79xxA_getRxBytesReceived();
-
-			if (ui8ReqFlag & BIT6) // Handle case for Option Flag causing one extra byte to be transmitted.
-			{
-				ui8Offset = 2;
-			}
-			else
-			{
-				ui8Offset = 1;
-			}
-
-			// Output received data to UART
-			for (ui8LoopCount = ui8Offset; ui8LoopCount < ui8RxLength; ui8LoopCount++)
-			{
-				UART_putByte(g_pui8TrfBuffer[ui8LoopCount]);		// Send out data read from tag to host
-			}
-
-			UART_putChar(']');
-			UART_putNewLine();
-#endif
+			// Results are in g_pui8TrfBuffer[1] to g_pui8TrfBuffer[4]
+			*data_buff 		= g_pui8TrfBuffer[1];
+			*(data_buff+1) 	= g_pui8TrfBuffer[2];
+			*(data_buff+2) 	= g_pui8TrfBuffer[3];
+			*(data_buff+3) 	= g_pui8TrfBuffer[4];
 		}
 		else
 		{
 			// Received an error from the tag
 			ui8Status = STATUS_FAIL;
-#ifdef ENABLE_HOST
-			// 	Indicates when an error occurs or block addresses are unreachable - useful for debugging
-			UART_sendCString("Block ");
-			UART_putByte(((ui16BlockNumber >> 8) & 0xFF));		// Output block number
-			UART_putByte((ui16BlockNumber & 0xFF));
-			UART_sendCString(" Error");
-			UART_putNewLine();
-			UART_sendCString("ISO15693 Error Code: ");
-			UART_putByte(g_pui8TrfBuffer[1]);						// Output ISO15693 error code
-			UART_putNewLine();
-#endif
 		}
 	}
 	else
