@@ -1,8 +1,5 @@
 #include "main.h"
 
-/* Timer Clock Scale */
-//uint32_t uwPrescalerValue = 0;
-
 int main(void)
 {
 	/* STM32F103xB HAL library initialization:
@@ -29,11 +26,15 @@ int main(void)
 	GPIO_Config_EN();
 	/* Set TRF7970 IRQ */
 	GPIO_Config_IRQ();
+	/* Motor GPIO Configure */
+	GPIO_Config_Motor_Ground();
+	GPIO_Config_Motor_Control();
+	/* Initialize UART */
+	UART1_Init();
 	/* Set Timer instance */
 	Timer_Config_Wait();
 	Timer_Config_Delay();
-	/* Initialize UART */
-	UART1_Init();
+	Timer_Config_PWM(70);		// PWM on PB6, input width 0~100
 
 
 	/*************************** Controlling TRF7970ABP ***************************/
@@ -45,6 +46,12 @@ int main(void)
 	/* Data structure for transmitting data on UART */
 	struct dataPacket pkt;
 
+
+	// Start PWM
+	HAL_GPIO_WritePin(MOTOR_GROUND_GPIO_PORT, MOTOR_GROUND_PIN,  GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(MOTOR_CONTROL_GPIO_PORT, MOTOR_CONTROL_PIN, GPIO_PIN_RESET);
+	if (HAL_TIM_PWM_Start(&PWM_TimHandle, PWM_CHANNEL) != HAL_OK)
+		Error_Handler();
 
 	// Set the SPI SS high
 	HAL_GPIO_WritePin(SPIx_SS_GPIO_PORT, SPIx_SS_PIN,  GPIO_PIN_SET);
@@ -61,6 +68,9 @@ int main(void)
 	// Poll for NFC tags
 	while (1)
 	{
+		// Start the motor
+		HAL_GPIO_WritePin(MOTOR_CONTROL_GPIO_PORT, MOTOR_CONTROL_PIN, GPIO_PIN_SET);
+
 		// Temperate variables
 		uint8_t ui8TagFound = STATUS_FAIL;
 		uint8_t ui8AddressedFlag = 0x00;
@@ -102,6 +112,9 @@ int main(void)
 
 			if (compareUID(g_pui8Iso15693UId, lastReadUID) == ID_DIFF)
 			{
+				// Stop the motor
+				HAL_GPIO_WritePin(MOTOR_CONTROL_GPIO_PORT, MOTOR_CONTROL_PIN, GPIO_PIN_RESET);
+
 				// Read an ISO15693 tag which has extended protocol implemented
 				if (TRF79xxA_ISO15693_ReadExtendedTag(0x0A | ui8AddressedFlag, pkt.tag_data) == STATUS_SUCCESS)
 				{
@@ -192,19 +205,7 @@ void Error_Handler(void) {
 	}
 }
 
-
-
-/********************************************************/
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
-{
-}
-
-void HAL_UART_ErrorCallback(UART_HandleTypeDef *UartHandle)
-{
-    Error_Handler();
-}
-
+/**************************** Utility Functions ****************************/
 
 uint8_t compareUID(uint8_t* id_a, uint8_t* id_b) {
 	int i = 0;

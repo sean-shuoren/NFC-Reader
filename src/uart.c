@@ -65,3 +65,12 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef *huart)
 
   HAL_NVIC_DisableIRQ(USARTx_IRQn);
 }
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
+{
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *UartHandle)
+{
+    Error_Handler();
+}

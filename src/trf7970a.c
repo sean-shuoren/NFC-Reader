@@ -1,5 +1,6 @@
 #include "trf7970a.h"
 #include "timer.h"
+#include "gpio.h"
 
 
 //===============================================================
@@ -1156,7 +1157,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	}
 
 	// If this is Timer for TRF79xxA communication purpose
-	if (htim->Instance == TIMx) {
+	if (htim->Instance == WAIT_TIM) {
 
 		// Read IRQ on the second timer
 		if (waitStatus == TIM_WAIT) {
@@ -1186,8 +1187,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 //! \return None.
 //
 //===============================================================
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-	if (GPIO_Pin == TRF79XXA_IRQ_PIN) {
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if (GPIO_Pin == TRF79XXA_IRQ_PIN)
+	{
 		// TRF79xxA_irqHandler
 		uint8_t ui8IrqStatus;
 
