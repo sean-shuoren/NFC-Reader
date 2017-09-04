@@ -7,6 +7,7 @@
 #include "timer.h"
 #include "gpio.h"
 #include "trf7970a.h"
+#include "iso15693.h"
 
 
 /* Private macro -------------------------------------------------------------*/

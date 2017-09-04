@@ -74,11 +74,7 @@
 // TRF7970A and TRF7964A - 127 bytes
 // TRF7960A, TRF7961A, TRF7962A, and TRF7963A - 12 bytes
 //
-#if (TRF79xxA_VERSION == 70)
 #define TRF79xxA_MAX_FIFO_SIZE 			127
-#elif (TRF79xxA_VERSION == 60)
-#define TRF79xxA_MAX_FIFO_SIZE 			12
-#endif
 
 //
 // This defines the size of the FIFO buffer generated. This size comes out of RAM memory.
@@ -127,52 +123,6 @@ typedef enum
 	NO_RESPONSE_RECEIVED,
 	NO_RESPONSE_RECEIVED_15693
 }tTrfStatus;
-
-//===============================================================
-//==== Version History ==========================================
-//
-// REV.   DATE        		WHO    			DETAIL
-// 1.00	  July 30, 2015		RJ				Working ISO14443A, ISO14443B, and ISO15693 Reader firmware, with basic NDEF support for Type 4 tags.
-// 1.01	  Aug 3, 2015		RJ				Added SpiReceiveByte and SpiSendByte functions, added #define for Standalone mode, revised comments
-// 1.02	  Aug 5, 2015		RJ				Added UART outputs to ISO14443A Anticollision and Selection process, verified Type 2 Reader
-// 1.03	  Aug 7, 2015		RJ				Added Felica read functionality, fixed issue with TRF Driver which caused firmware to lock up
-// 1.04	  Aug 13, 2015		RJ				Updated Felica tag identification table, revised available NDEF commands, updated naming conventions for hardware layer drivers
-// 1.05	  Sept 4, 2015		RJ				Fixed issue with ISO15693 Anticollision, updated function header comments for uart.c, mcu.c, and trf797x.c
-// 1.06	  Sept 16, 2015		RJ				Fixes to ISO15693 Anticollision recursion, reduced global buffer size, improved checks for RF field/ISO Control register settings prior to issuing RF commands
-// 1.07	  Sept 22, 2015		RJ				Revamp of ISO14443A Anticollision. Testing in progress - can handle first round of collisions for Double UID tags.
-// 1.08	  Sept 28, 2015		RJ				Finished correct implementation of ISO14443A Anticollision, made changes to ISO15693 Anticollision to save significant stack space.
-// 1.09	  Sept 30, 2015		RJ				Revised ISO14443B Anticollision procedure and SlotMarker function. Updated ISO14443A StoreUID function to handle if the last UID bytes received start with 0x88
-// 1.10	  Oct 6, 2015		RJ				Finished Doxygen comments for ISO14443B. Edited file names for NDEF and the TRF Driver. Updated the application layer to make it more intuitive.
-// 1.11	  Oct 8, 2015		RJ				Updated LED Behaviors. Made additional modifications to the application layer.
-// 1.12	  Oct 19, 2015		RJ				Modified FeliCa polling functionality.
-// 1.13	  Oct 21, 2015		RJ				Minor application layer improvements.
-// 1.14	  Nov 5, 2015		RJ				Fixes to ISO15693 Write Single Block function for transmitting with the option flag. Modified TRF Driver to handle FIFO Watermark during RX. Added #define for FIFO buffer size.
-// 1.15   Nov 12, 2015		RJ				Fix to modulation depths during TRF initialization. Adjustments to Type 4 NDEF file to handle max FIFO Size. Adjustments to Type 2/4A Application handling.
-// 1.16   Nov 19, 2015		RJ				Fix to ISO15693 No Response Timeout handling in TRF Driver.
-// 1.17   Dec 16, 2015		RJ				Fixed issue with ISO15693 recursive call overflowing stack with updated anticollision process.
-// 1.18   Jan 7, 2016		RJ				Fixed issue with ISO14443A Anticollision buffers being overflown. Adjusted Application Layer behavior for ISO15693. Added check for PPS support when receiving ATS for ISO14443A.
-// 2.00   Jan 8, 2016		RJ				Preparation for release - cleaned up code files, finished comments, removed debugging sections
-// 2.01   Jan 12, 2016		RJ				Minor modifications to application to improve Out of the Box experience, fixes to NDEF process for Type 4 Tags.
-// 2.02   Mar 10, 2016		RJ				Updated naming of functions in some files to follow naming conventions better.
-// 2.03   Mar 23, 2016		RJ				Re-worked initialization of global variables, added Type 2 Write Single Block function, adjusted Terminal data outputs to lessen Flash memory impact
-// 2.04   Apr 18, 2016		RJ				Added 4 bit ACK/NAK support for ISO14443A Type 2 Tags.
-// 2.05   May 17, 2016		RJ				Added soft reset on protocol errors, fixes to 4 bit ACK/NAK support, clarified some Timer names
-// 2.06   June 29, 2016		RJ				Resolved issues with Soft Reset functionality in specific subcases, added external RF field avoidance checks, updated Regular Control settings
-// 2.07   Aug 29, 2016		RJ				Added VLO Calibration to handle VLO drifting over time, adjusted TRF7970A software reset sequence
-// 2.08   Aug 31, 2016		RJ				Significant TRF driver updates - begun to add hooks to support both 60A and 70A, function naming updates, removal of unneeded functions, updates to check external RF field
-// 2.09   Sept 14, 2016     RJ				Finished primary TRF driver updates, renamed functions across NFC stack, added recursion count to ISO15693 anticollision to prevent any possible stack overflows
-// 2.10   Nov 9, 2016       RJ				Renamed a few remaining TRF driver functions, added API to allow higher levels to fetch TRF buffer, added Doxygen comments to TRF driver and MCU layers
-// 2.11   Nov 21, 2016      RJ				Added Doxygen comments to NFC Layers, edited multiple NDEF functions, changed an if else tree to a switch statement in the ISO14443A_sendPPS function
-// 3.00   Feb 22, 2017		RJ				Added support for TRF7960A which required re-work of Write FIFO and TX/RX Wait functions.
-// 3.01   Mar 20, 2017		RJ				Bug fixes to updated TRF79xx FIFO handling and ISO15693 layer.
-
-//===============================================================
-//==== Version Control ==========================================
-
-#define RFID_READER_FW_VERSION		"3.01"
-#define RFID_READER_FW_DATE			"March 20th, 2017"
-
-//===============================================================
 
 //==== TRF797x definitions ======================================
 
@@ -260,68 +210,41 @@ tTrfSettings g_eTrfGeneralSettings;
 volatile uint8_t g_ui8IrqFlag;
 volatile uint8_t g_ui8TimeoutFlag;
 
-/* ISO 15693 specific */
-uint8_t g_pui8Iso15693UId[8];				// Initialized as 0xFF
-uint8_t g_pui8AnticollisionMaskBuffer[8];	// Initialized as 0x00
-uint8_t g_ui8TagDetectedCount;
-uint8_t g_ui8RecursionCount;
-
 
 //===============================================================
 
-extern void TRF79xxA_setupInitiator(uint8_t ui8IsoControl);
-extern void TRF79xxA_initialSettings(void);
-extern bool TRF79xxA_checkExternalRfField(void);
+void TRF79xxA_setupInitiator(uint8_t ui8IsoControl);
+void TRF79xxA_initialSettings(void);
+bool TRF79xxA_checkExternalRfField(void);
 
-extern void TRF79xxA_turnRfOff(void);
-extern void TRF79xxA_turnRfOn(void);
-extern void TRF79xxA_disableSlotCounter(void);
-extern void TRF79xxA_enableSlotCounter(void);
-extern tTrfStatus TRF79xxA_getTrfStatus(void);
-extern void TRF79xxA_setTrfStatus(tTrfStatus sTrfStatus);
-extern uint8_t TRF79xxA_getCollisionPosition(void);
-extern void TRF79xxA_setCollisionPosition(uint8_t ui8ColPos);
-extern uint8_t TRF79xxA_getRxBytesReceived(void);
-extern uint8_t * TRF79xxA_getTrfBuffer(void);
-extern uint8_t TRF79xxA_getIsoControlValue(void);
+void TRF79xxA_turnRfOff(void);
+void TRF79xxA_turnRfOn(void);
+void TRF79xxA_disableSlotCounter(void);
+void TRF79xxA_enableSlotCounter(void);
+tTrfStatus TRF79xxA_getTrfStatus(void);
+void TRF79xxA_setTrfStatus(tTrfStatus sTrfStatus);
+uint8_t TRF79xxA_getCollisionPosition(void);
+void TRF79xxA_setCollisionPosition(uint8_t ui8ColPos);
+uint8_t TRF79xxA_getRxBytesReceived(void);
+uint8_t * TRF79xxA_getTrfBuffer(void);
+uint8_t TRF79xxA_getIsoControlValue(void);
 
-extern void TRF79xxA_reset(void);
-extern void TRF79xxA_resetFIFO(void);
+void TRF79xxA_reset(void);
+void TRF79xxA_resetFIFO(void);
 
-extern uint8_t TRF79xxA_readIrqStatus(void);
-extern void TRF79xxA_processIRQ(uint8_t * pui8IrqStatus);
-extern void TRF79xxA_resetIrqStatus(void);
-extern void TRF79xxA_waitTxIRQ(uint8_t ui8TxTimeout);
-extern void TRF79xxA_waitRxIRQ(uint8_t ui8RxTimeout);
-extern tTrfStatus TRF79xxA_waitRxData(uint8_t ui8TxTimeout, uint8_t ui8RxTimeout);
+uint8_t TRF79xxA_readIrqStatus(void);
+void TRF79xxA_processIRQ(uint8_t * pui8IrqStatus);
+void TRF79xxA_resetIrqStatus(void);
+void TRF79xxA_waitTxIRQ(uint8_t ui8TxTimeout);
+void TRF79xxA_waitRxIRQ(uint8_t ui8RxTimeout);
+tTrfStatus TRF79xxA_waitRxData(uint8_t ui8TxTimeout, uint8_t ui8RxTimeout);
 
-extern void TRF79xxA_readContinuous(uint8_t * pui8Payload, uint8_t ui8Length);
-extern void TRF79xxA_writeContinuous(uint8_t * pui8Payload, uint8_t ui8Length);
-extern uint8_t TRF79xxA_readRegister(uint8_t ui8TrfRegister);
-extern void TRF79xxA_writeRegister(uint8_t ui8TrfRegister, uint8_t ui8Value);
-extern void TRF79xxA_sendDirectCommand(uint8_t ui8Value);
-extern void TRF79xxA_writeRaw(uint8_t * pui8Payload, uint8_t ui8Length);
-
-
-/* ISO 15693 specific */
-#define ISO15693_MAX_RECURSION_COUNT	8
-
-extern void TRF79xxA_ISO15693_init(void);
-extern uint8_t TRF79xxA_ISO15693_sendSingleSlotInventory(void);
-extern uint8_t TRF79xxA_ISO15693_runAnticollision(uint8_t ui8ReqFlags, uint8_t ui8MaskLength, uint8_t ui8Afi);
-extern void TRF79xxA_ISO15693_ReadTag(uint8_t ui8ReqFlag);
-extern uint8_t TRF79xxA_ISO15693_ReadExtendedTag(uint8_t ui8ReqFlag, uint8_t* dataBuf);
-extern uint8_t TRF79xxA_ISO15693_sendReadMultipleBlocks(uint8_t ui8ReqFlag, uint8_t ui8FirstBlock, uint8_t ui8NumberOfBlocks);
-
-uint16_t TRF79xxA_ISO15693_sendGetSystemInfo(uint8_t ui8ReqFlag);
-uint16_t TRF79xxA_ISO15693_sendGetSystemInfoExtended(uint8_t ui8ReqFlag);
-uint8_t TRF79xxA_ISO15693_sendReadSingleBlock(uint8_t ui8ReqFlag, uint8_t ui8BlockNumber);
-uint8_t TRF79xxA_ISO15693_sendReadSingleBlockExtended(uint8_t ui8ReqFlag, uint16_t ui16BlockNumber, uint8_t* data_buff);
-
-
-
-//===============================================================
-
+void TRF79xxA_readContinuous(uint8_t * pui8Payload, uint8_t ui8Length);
+void TRF79xxA_writeContinuous(uint8_t * pui8Payload, uint8_t ui8Length);
+uint8_t TRF79xxA_readRegister(uint8_t ui8TrfRegister);
+void TRF79xxA_writeRegister(uint8_t ui8TrfRegister, uint8_t ui8Value);
+void TRF79xxA_sendDirectCommand(uint8_t ui8Value);
+void TRF79xxA_writeRaw(uint8_t * pui8Payload, uint8_t ui8Length);
 
 
 #endif

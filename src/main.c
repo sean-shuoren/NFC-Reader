@@ -1,5 +1,9 @@
 #include "main.h"
 
+#define TEST_WRITE
+#define IoT_TRANSMIT
+
+
 int main(void)
 {
 	/* STM32F103xB HAL library initialization:
@@ -34,20 +38,22 @@ int main(void)
 	/* Set Timer instance */
 	Timer_Config_Wait();
 	Timer_Config_Delay();
-	Timer_Config_PWM(70);		// PWM on PB6, input width 0~100
+	Timer_Config_PWM(85);		// PWM on PB6, input pulse width 0~100
 
 
 	/*************************** Controlling TRF7970ABP ***************************/
 
-	/* Initialize lastUID */
+	/* Initialize lastUID with invalid UID */
 	int i;
-	for (i = 0; i < 8; ++i)
+	for (i = 0; i < 8; ++i) {
 		lastReadUID[i] = 0xFF;
+	}
+
 	/* Data structure for transmitting data on UART */
 	struct dataPacket pkt;
 
 
-	// Start PWM
+	// Start PWM for conveyer belt
 	HAL_GPIO_WritePin(MOTOR_GROUND_GPIO_PORT, MOTOR_GROUND_PIN,  GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(MOTOR_CONTROL_GPIO_PORT, MOTOR_CONTROL_PIN, GPIO_PIN_RESET);
 	if (HAL_TIM_PWM_Start(&PWM_TimHandle, PWM_CHANNEL) != HAL_OK)
@@ -63,7 +69,7 @@ int main(void)
 	// Set up TRF initial settings
 	TRF79xxA_initialSettings();
 	// Initialize all Global Variables for the ISO15693 layer
-	TRF79xxA_ISO15693_init();
+	ISO15693_init();
 
 	// Poll for NFC tags
 	while (1)
@@ -87,7 +93,7 @@ int main(void)
 		TRF79xxA_setupInitiator(0x02);
 
 		// Send a single slot inventory request to try and detect a single ISO15693 Tag
-		ui8TagFound = TRF79xxA_ISO15693_sendSingleSlotInventory();		/* STATUS_FAIL == 0x01 */
+		ui8TagFound = ISO15693_Inventory();		/* STATUS_FAIL == 0x01 */
 
 		// Inventory failed - search with full anticollision routine
 #ifdef ANTI_COLLISION
@@ -98,7 +104,7 @@ int main(void)
 			delayMilliSeconds(5);
 
 			// Send 16 Slot Inventory request with no mask length and no AFI
-			ui8TagFound = TRF79xxA_ISO15693_runAnticollision(0x06, 0x00, 0x00);
+			ui8TagFound = ISO15693_runAnticollision(0x06, 0x00, 0x00);
 
 			// Collision occurred, send addressed commands
 			ui8AddressedFlag = 0x20;
@@ -107,16 +113,29 @@ int main(void)
 
 		if (ui8TagFound == STATUS_SUCCESS && g_ui8TagDetectedCount == 1)
 		{
-			// RSSI value is the receive signal strength
-			uint8_t RSSI = TRF79xxA_readRegister(TRF79XXA_RSSI_LEVELS);		/* [01]-[3 bits auxiliary channel RSSI]-[3 bits main channel RSSI] */
 
-			if (compareUID(g_pui8Iso15693UId, lastReadUID) == ID_DIFF)
+#ifdef TEST_WRITE
+			uint8_t buf [4];
+			buf[0] = 0xAA;
+			buf[1] = 0xBB;
+			buf[2] = 0xCC;
+			buf[3] = 0xDD;
+			if (ISO15693_WriteSingleBlock(0x0A | ui8AddressedFlag, 10, buf) == STATUS_FAIL) {
+				return STATUS_FAIL;
+			}
+			if (ISO15693_ReadSingleBlock(0x0A | ui8AddressedFlag, 10, buf) == STATUS_FAIL) {
+				return STATUS_FAIL;
+			}
+#endif
+
+#ifdef IoT_TRANSMIT
+			if (compareUID(g_pui8Iso15693UId, lastReadUID) == ID_DIFF)		// prevent multiple reads on same tag on the conveyer belt
 			{
-				// Stop the motor
+				// Stop PWM for conveyer belt
 				HAL_GPIO_WritePin(MOTOR_CONTROL_GPIO_PORT, MOTOR_CONTROL_PIN, GPIO_PIN_RESET);
 
 				// Read an ISO15693 tag which has extended protocol implemented
-				if (TRF79xxA_ISO15693_ReadExtendedTag(0x0A | ui8AddressedFlag, pkt.tag_data) == STATUS_SUCCESS)
+				if (CustomReadTag(0x0A | ui8AddressedFlag, pkt.tag_data) == STATUS_SUCCESS)
 				{
 					// Fill in data sections
 					copyUID(pkt.uid, g_pui8Iso15693UId);
@@ -130,10 +149,10 @@ int main(void)
 						Error_Handler();
 					}
 				}
-
 				// Update last read UID
 				copyUID(lastReadUID, g_pui8Iso15693UId);
 			}
+#endif
 		}
 		// Turn off RF field once done reading the tag(s)
 		TRF79xxA_turnRfOff();
@@ -145,7 +164,7 @@ int main(void)
 	HAL_Delay(2);
 	HAL_GPIO_WritePin(TRF79XXA_EN_GPIO_PORT, TRF79XXA_EN_PIN, GPIO_PIN_RESET);
 
-} // main
+}
 
 
 /**
